@@ -1,0 +1,667 @@
+
+<?php
+// default module template
+// use this to create modules for houses
+// Author: Chaosmaker <webmaster@chaosonline.de>
+
+// all function names MUST end with the module's name (as in $info['modulename'])!!!
+// hint: use search&replace ;) replace 'treasury' with your module's (internal) name.
+function module_getinfo_treasury() {
+    $info = array(
+                    'modulename'=>'treasury',         // internal name; use letters, numbers and underscores only!
+                    'modulefile'=>basename(__FILE__),     // filename of the module; if you allow to rename the script, do NOT change this!
+                    'moduleauthor'=>'Chaosmaker',             // the author's name
+                    'moduleversion'=>'1.0',            // the module's version number
+                    'built_in'=>'1',                // '1', if each house should have this module built-in; otherwise '0'
+                    'linkcategory'=>'Weitere RÃ¤ume',            // the category (in houses.php's menu) under which the link to this module should be shown
+                    'linktitle'=>'Schatzkammer',            // the link title of the module
+                    'showto'=>'owner,guest'                        // who should use this module? possible options: 'owner', 'guest' and 'owner,guest'
+    );
+    return $info;
+}
+
+function module_install_treasury() {
+    // insert data into module table - do NOT change this (well... just change the function name ;))!
+    $info = module_getinfo_treasury();
+    $sql = "INSERT INTO housemodules
+                (modulefile, modulename, moduleversion, moduleauthor, built_in, linkcategory, linktitle,showto)
+                VALUES ('{$info['modulefile']}', '{$info['modulename']}', '{$info['moduleversion']}', '{$info['moduleauthor']}', '{$info['built_in']}', '{$info['linkcategory']}', '{$info['linktitle']}', '{$info['showto']}')";
+    db_query($sql);
+    $moduleid = db_insert_id(LINK);
+
+    // insert global module data (you can add several entries - but do NOT
+    // change anything else than "FieldName" and "FieldValue"!)
+    /*
+    $sql = 'INSERT INTO housemoduledata (moduleid, name, houseid, value)
+                VALUES ('.$moduleid.',"FieldName",0,"FieldValue")';
+    db_query($sql);
+    */
+    /* install_moduledata begin */
+
+/* install_moduledata end */
+
+    // here you can change everything else needed (e.g. adding settings)
+    // be careful: these changes must be global; per-house-changes will be done
+    // in module_build()!
+    /* install_other begin */
+
+/* install_other end */
+}
+
+function module_uninstall_treasury() {
+    // uninstalling the module
+    // this function should also contain all module_destroy contents
+
+    // getting moduleid - do NOT change this (same as above... the function name should be changed)!
+    $info = module_getinfo_treasury();
+    $moduleid = getmoduleid($info['modulename']);
+
+    // deleting module from db - do NOT change this!
+    $sql = 'DELETE FROM housemodules WHERE moduleid='.$moduleid;
+    db_query($sql);
+
+    // deleting internal module data - do NOT change this!
+    $sql = 'DELETE FROM housemoduledata WHERE moduleid='.$moduleid;
+    db_query($sql);
+
+    // here you should delete all other added things (e.g. settings) of this module
+    /* delete_other begin */
+
+/* delete_other end */
+}
+
+function module_build_treasury($houseid) {
+    // this is only needed if 'built_in' in module_info() is set to 0
+
+    // getting moduleid - do NOT change this (function name... blablabla)!
+    $info = module_getinfo_treasury();
+    $moduleid = getmoduleid($info['modulename']);
+
+    // setting flag for house - do NOT change this!
+    $sql = 'INSERT INTO housemoduledata (moduleid, name, houseid, value)
+                VALUES ('.$moduleid.',"#activated#",'.$houseid.',"1")';
+    db_query($sql);
+
+    // here you can change everything else needed (e.g. changing user settings)
+    // be careful: these changes must be for this house only; global changes will be done
+    // in module_install()!
+    /* build_other begin */
+
+/* build_other end */
+}
+
+function module_destroy_treasury($houseid) {
+    // this is only needed if 'built_in' in module_info() is set to 0
+
+    // getting moduleid - do NOT change this (function name... moooooooooh!)!
+    $info = module_getinfo_treasury();
+    $moduleid = getmoduleid($info['modulename']);
+
+    // deleting module data of this house - do NOT change this!
+    $sql = 'DELETE FROM housemoduledata WHERE moduleid='.$moduleid.' AND houseid='.$houseid;
+    db_query($sql);
+
+    // here you should delete all other added things (e.g. user settings) of this module and house
+    /* destroy_other begin */
+
+/* destroy_other end */
+}
+
+function module_show_treasury() {
+    // this is the main part of the module where all output is done ;)
+    // don't forget the navs; only the default module does not need them (but may add some)
+    // to return to the main module, use this link: houses.php?op=drin&module (without id!)
+    // don't forget 'global $session;' if you need the player's data (and you WILL need them!)
+   
+   /* content_show begin */
+    global $session;
+
+    $sql = "SELECT houses.housename, houses.description, houses.owner, houses.treasury_level, accounts.name AS ownername FROM houses LEFT JOIN accounts ON accounts.acctid=houses.owner WHERE houses.houseid='".$session['user']['specialmisc']['houseid']."'";
+    $result = db_query($sql) or die(db_error(LINK));
+    $row = db_fetch_assoc($result);
+
+    output("`b`c `q".$row['housename']." - Schatzkammer`n`0(".($row['ownername']!=""?$row['ownername']."`0":"`iverlassen`i").")`c`b`n",true);
+    
+    $gold_limit = 50000 * $row['treasury_level'];
+    $gem_limit = 250 * $row['treasury_level'];
+    
+    if ($_GET['act']=="takekey") {
+        if (empty($_POST['ziel'])) {
+            $sql = "SELECT items.owner, accounts.name FROM items LEFT JOIN accounts ON items.owner=accounts.acctid WHERE items.value1={$session['user']['specialmisc']['houseid']} AND items.class='SchlÃ¼ssel' AND accounts.acctid > 0 AND items.owner!='{$session['user']['acctid']}' ORDER BY items.value2 ASC";
+            $result = db_query($sql) or die(db_error(LINK));
+            output("<form action='houses.php?op=drin&act=takekey' method='POST'>",true);
+            output("`2Wem willst du den SchlÃ¼ssel wegnehmen? <select name='ziel'>",true);
+            while ($item = db_fetch_assoc($result)) {
+                output("<option value=\"".rawurlencode($item['name'])."\">".preg_replace("'[`].'","",$item['name'])."</option>",true);
+            }
+            output("</select>`n`n",true);
+            output("<input type='submit' class='button' value='SchlÃ¼ssel abnehmen'></form>",true);
+            addnav("","houses.php?op=drin&act=takekey");
+        }
+        else {
+            $sql = "SELECT acctid,name,login,gold,gems FROM accounts WHERE name='".addslashes(rawurldecode(stripslashes($_POST['ziel'])))."'";
+            $result2 = db_query($sql);
+            $row2  = db_fetch_assoc($result2);
+            output("`2Du verlangst den SchlÃ¼ssel von `&$row2[name]`2 zurÃ¼ck.`n");
+            $sql = "SELECT COUNT(id) AS num FROM items WHERE value1={$session['user']['specialmisc']['houseid']} AND class='SchlÃ¼ssel' AND owner!=0 AND owner!=".$session['user']['acctid'];
+            $result = db_query($sql) or die(db_error(LINK));
+            $keynum = db_fetch_assoc($result);
+
+            $sql = 'SELECT housename FROM houses WHERE houseid='.$session['user']['specialmisc']['houseid'];
+            $result = db_query($sql);
+            $row = db_fetch_assoc($result);
+
+            $info = module_getinfo_treasury();
+            $moduleid = getmoduleid($info['modulename']);
+            $goldinhouse = (int)getmoduledata($moduleid,'gold',$session['user']['specialmisc']['houseid']);
+            $gemsinhouse = (int)getmoduledata($moduleid,'gems',$session['user']['specialmisc']['houseid']);
+            $goldgive=round($goldinhouse / ($keynum['num']+1));
+            $gemsgive=round($gemsinhouse / ($keynum['num']+1));
+            if ($gemsgive > 0) $getstr = "`%$gemsgive Edelsteine`2";
+            else $getstr = '';
+            if ($goldgive > 0) {
+                if ($getstr!='') $getstr .= ' und ';
+                $getstr .= "`^$goldgive Gold`2 auf die Bank";
+            }
+            systemmail($row2['acctid'],"`@SchlÃ¼ssel zurÃ¼ckverlangt!`0","`&{$session['user']['name']}`2 hat den SchlÃ¼ssel zu Haus Nummer `b{$session['user']['specialmisc']['houseid']}`b ($row[housename]`2) zurÃ¼ckverlangt. Du bekommst $getstr aus dem gemeinsamen Schatz ausbezahlt!");
+            output("$row2[name]`2 bekommt `^$goldgive Gold`2 und `%$gemsgive Edelsteine`2 aus dem gemeinsamen Schatz.");
+            $sql = "UPDATE items SET owner={$session['user']['acctid']},hvalue=0 WHERE owner=$row2[acctid] AND class='SchlÃ¼ssel' AND value1=".$session['user']['specialmisc']['houseid'];
+            db_query($sql);
+            $sql = "UPDATE accounts SET goldinbank=goldinbank+$goldgive,gems=gems+$gemsgive WHERE acctid=".$row2['acctid'];
+            db_query($sql);
+            setmoduledata($moduleid,'gold',$goldinhouse-$goldgive,$session['user']['specialmisc']['houseid']);
+            setmoduledata($moduleid,'gems',$gemsinhouse-$gemsgive,$session['user']['specialmisc']['houseid']);
+            $sql = "INSERT INTO commentary (postdate,section,author,comment) VALUES (now(),'house_tresor-".$session['user']['specialmisc']['houseid']."',".$session['user']['acctid'].",'".$session['user']['name']."`0 `^nimmt $row2[name]`^ einen SchlÃ¼ssel ab. $row2[name]`^ bekommt einen Teil aus dem Schatz.')";
+            db_query($sql) or die(db_error(LINK));
+        }
+        addnav('ZurÃ¼ck');
+        addnav("Schatzkammer","houses.php?op=drin");
+        addnav("zum Gemeinschaftsraum","houses.php?op=drin&module=");
+    }
+    elseif ($_GET['act']=="givekey") {
+        if (empty($_POST['ziel'])) {
+            output("`2Einen SchlÃ¼ssel fÃ¼r dieses Haus hat:`n`n");
+            $sql = "SELECT items.*,accounts.name AS besitzer FROM items LEFT JOIN accounts ON accounts.acctid=items.owner WHERE value1={$session['user']['specialmisc']['houseid']} AND class='SchlÃ¼ssel' AND owner!=".$session['user']['acctid']." ORDER BY value2 ASC";
+            $result = db_query($sql) or die(db_error(LINK));
+            while ($item = db_fetch_assoc($result)) {
+                output("`c`& $item[besitzer]`0`c");
+            }
+            $sql = "SELECT COUNT(id) AS num FROM items WHERE value1={$session['user']['specialmisc']['houseid']} AND class='SchlÃ¼ssel' AND owner=".$session['user']['acctid'];
+            $result = db_query($sql) or die(db_error(LINK));
+            $keynum = db_fetch_assoc($result);
+            if ($keynum['num']>0) {
+                output("`n`2Du kannst noch `b".$keynum['num']."`b SchlÃ¼ssel vergeben.");
+                output("<form action='houses.php?op=drin&module=6&act=givekey' method='POST'>",true);
+                output("An wen willst du einen SchlÃ¼ssel Ã¼bergeben? <input name='ziel'>`n", true);
+                output("<input type='submit' class='button' value='Ãœbergeben'></form>",true);
+                output("`n`nWenn du einen SchlÃ¼ssel vergibst, wird der Schatz des Hauses gemeinsam genutzt. Du kannst einem Mitbewohner zwar jederzeit den SchlÃ¼ssel wieder wegnehmen, ");
+                output("aber er wird dann einen gerechten Anteil aus dem gemeinsamen Schatz bekommen.");
+                addnav("","houses.php?op=drin&module=6&act=givekey");
+            }
+            else {
+                output("`n`2Du hast keine SchlÃ¼ssel mehr Ã¼brig. Vielleicht kannst du in der JÃ¤gerhÃ¼tte noch einen nachmachen lassen?");
+            }
+        }
+        else {
+            if ($_GET['subfinal']==1) {
+                $sql = "SELECT acctid,name,login,lastip,emailaddress FROM accounts WHERE name='".addslashes(rawurldecode(stripslashes($_POST['ziel'])))."' AND locked=0 AND dragonkills >= ".getsetting('housekeymindk',0);
+            }
+            else {
+                $ziel = stripslashes(rawurldecode($_POST['ziel']));
+                $name="%";
+                for ($x=0;$x<strlen($ziel);$x++) {
+                    $name.=substr($ziel,$x,1)."%";
+                }
+                $sql = "SELECT acctid,name,login,lastip FROM accounts WHERE name LIKE '".addslashes($name)."' AND locked=0 AND dragonkills >= ".getsetting('housekeymindk',0)." AND acctid!=".$session['user']['acctid'];
+            }
+            $result2 = db_query($sql);
+            if (db_num_rows($result2) == 0) {
+                output("`2Es gibt niemanden mit einem solchen Namen. Versuchs nochmal.");
+            }
+            elseif (db_num_rows($result2) > 100) {
+                output("`2Es gibt Ã¼ber 100 Krieger mit einem Ã¤hnlichen Namen. Bitte sei etwas genauer.");
+            }
+            elseif (db_num_rows($result2) > 1) {
+                output("`2Es gibt mehrere mÃ¶gliche Krieger, denen du einen SchlÃ¼ssel Ã¼bergeben kannst.`n");
+                output("<form action='houses.php?op=drin&act=givekey&subfinal=1' method='POST'>",true);
+                output("`2Wen genau meinst du? <select name='ziel'>",true);
+                while ($row2 = db_fetch_assoc($result2)) {
+                    output("<option value=\"".rawurlencode($row2['name'])."\">".preg_replace("'[`].'","",$row2['name'])."</option>",true);
+                }
+                output("</select>`n`n",true);
+                output("<input type='submit' class='button' value='SchlÃ¼ssel Ã¼bergeben'></form>",true);
+                addnav("","houses.php?op=drin&act=givekey&subfinal=1");
+                //addnav("","houses.php?op=drin&act=givekey"); // why the hell was this in there?
+            }
+            else {
+                $row2  = db_fetch_assoc($result2);
+                $sql = "SELECT COUNT(owner) AS zahl FROM items WHERE owner=$row2[acctid] AND value1={$session['user']['specialmisc']['houseid']} AND class='SchlÃ¼ssel' ORDER BY id ASC";
+                $result = db_query($sql) or die(db_error(LINK));
+                $item = db_fetch_assoc($result);
+                if ($row2['login'] == $session['user']['login']) {
+                    output("`2Du kannst dir nicht selbst einen SchlÃ¼ssel geben.");
+                }
+                elseif ($item['zahl']>0) {
+                    output("`2$row2[name]`2 hat bereits einen SchlÃ¼ssel!");
+                 }
+                 elseif (ac_check($row2)){
+                    output("`2Deine Charaktere dÃ¼rfen leider nicht miteinander interagieren!");
+                }
+                else {
+                    $sql = "SELECT value2 FROM items WHERE value1={$session['user']['specialmisc']['houseid']} AND class='SchlÃ¼ssel' AND owner={$session['user']['acctid']} ORDER BY id ASC LIMIT 1";
+                    $result = db_query($sql) or die(db_error(LINK));
+                    $knr = db_fetch_assoc($result);
+                    $knr=$knr['value2'];
+                    $sql = 'SELECT housename FROM houses WHERE houseid='.$session['user']['specialmisc']['houseid'];
+                    $result = db_query($sql);
+                    $row = db_fetch_assoc($result);
+                    output("`2Du Ã¼bergibst `&$row2[name]`2 einen SchlÃ¼ssel fÃ¼r dein Haus. Du kannst den SchlÃ¼ssel zum Haus jederzeit wieder wegnehmen, aber $row2[name]`2 wird dann ");
+                    output("einen gerechten Anteil aus dem gemeinsamen Schatz des Hauses bekommen.`n");
+                    systemmail($row2['acctid'],"`@SchlÃ¼ssel erhalten!`0","`&{$session['user']['name']}`2 hat dir einen SchlÃ¼ssel zu Haus Nummer `b{$session['user']['specialmisc']['houseid']}`b ($row[housename]`2) gegeben!");
+                    $sql = "UPDATE items SET owner=$row2[acctid],hvalue=0 WHERE owner={$session['user']['acctid']} AND class='SchlÃ¼ssel' AND value1={$session['user']['specialmisc']['houseid']} AND value2=$knr";
+                    db_query($sql);
+                    $sql = "INSERT INTO commentary (postdate,section,author,comment) VALUES (now(),'house_tresor-".$session['user']['specialmisc']['houseid']."',".$session['user']['acctid'].",'".$session['user']['name']."`0 `^gibt $row2[name]`^ einen SchlÃ¼ssel.')";
+                    db_query($sql) or die(db_error(LINK));
+                }
+            }
+        }
+        addnav('ZurÃ¼ck');
+        addnav("Schatzkammer","houses.php?op=drin&module=6");
+        addnav("zum Gemeinschaftsraum","houses.php?op=drin&module=1");
+    }
+    elseif ($_GET['act']=='givebackkey') {
+        $sql = 'SELECT owner, housename FROM houses WHERE houseid='.$session['user']['specialmisc']['houseid'];
+        $result = db_query($sql);
+        $row = db_fetch_assoc($result);
+        output("`2Du legst den SchlÃ¼ssel fÃ¼r `&$row[housename]`2 auf den SchlÃ¼sselkasten.`n");
+        $sql = "UPDATE items SET owner=$row[owner],hvalue=0 WHERE owner=".$session['user']['acctid']." AND class='SchlÃ¼ssel' AND value1=".$session['user']['specialmisc']['houseid'];
+        db_query($sql);
+        $sql = "INSERT INTO commentary (postdate,section,author,comment) VALUES (now(),'house_tresor-".$session['user']['specialmisc']['houseid']."',".$session['user']['acctid'].",'".$session['user']['name']."`0 `^gibt einen SchlÃ¼ssel zurÃ¼ck.')";
+        db_query($sql) or die(db_error(LINK));
+        addnav('Wohnviertel',"houses.php");
+        addnav('v?Wohnviertel verlassen','houses.php?op=leave');
+    }
+    elseif ($_GET['act']=="takegold"){
+        $info = module_getinfo_treasury();
+        $moduleid = getmoduleid($info['modulename']);
+        $goldinhouse = (int)getmoduledata($moduleid,'gold',$session['user']['specialmisc']['houseid']);
+        
+        $action = isset($_POST['action']) ? $_POST['action'] : '';
+        
+        if ($action == 'takegold') {
+            $amt=(int)$_POST['gold'];
+            if ($amt>$goldinhouse){
+                output("`2So viel Gold ist nicht mehr da.");
+            }
+            elseif ($amt<0) {
+                output("`2Wenn du etwas in den Schatz legen willst, versuche nicht, etwas negatives herauszunehmen.");
+            }
+            else {
+                $amt = $amt == 0 ? $goldinhouse : $amt;
+                $goldinhouse -= $amt;
+                setmoduledata($moduleid,'gold',$goldinhouse,$session['user']['specialmisc']['houseid']);
+                $session['user']['gold'] += $amt;
+                output("`2Du hast `^$amt`2 Gold genommen. Insgesamt befindet sich jetzt noch `^$goldinhouse`2 Gold im Haus.");
+                $sql = "INSERT INTO commentary (postdate,section,author,comment) VALUES (now(),'house_tresor-".$session['user']['specialmisc']['houseid']."',".$session['user']['acctid'].",'".$session['user']['name']."`0 `\$nimmt `^$amt`\$ Gold.')";
+                db_query($sql) or die(db_error(LINK));
+            }
+        }
+        else {
+            output("`2Es befindet sich `^$goldinhouse`2 Gold in der Schatztruhe des Hauses.`n");
+            output("`2<form action=\"houses.php?op=drin&act=takegold\" method='POST'>",true);
+            output("<input type='hidden' name='action' value='takegold'>",true);
+            output("`nWieviel Gold mitnehmen? <input type='text' name='gold'>`n`n",true);
+            output("<input type='submit' class='button' value='Mitnehmen'>",true);
+            addnav("","houses.php?op=drin&act=takegold");
+            output("</form>", true);
+        }
+        addnav('ZurÃ¼ck');
+        addnav("Schatzkammer","houses.php?op=drin");
+        addnav("zum Gemeinschaftsraum","houses.php?op=drin&module=");
+    }
+    elseif ($_GET['act']=="givegold") {        
+        if ($row['treasury_level'] == 20) {
+            $gold_limit = 999999999;
+        }
+        
+        $info = module_getinfo_treasury();
+        $moduleid = getmoduleid($info['modulename']);
+        $goldinhouse = (int)getmoduledata($moduleid,'gold',$session['user']['specialmisc']['houseid']);
+        if (empty($_POST['gold'])) {
+            //$transleft = $maxout - $session['user']['amountouttoday'];
+            //output("`2Du darfst heute noch `^$transleft`2 Gold deponieren.`n");
+            
+            output("`2Derzeit befinden sich `^{$goldinhouse} Gold `2im Schatz.`n");
+            output("Du kannst noch `^".($gold_limit - $goldinhouse)." Gold `2deponieren.`n");
+            output("`2<form action=\"houses.php?op=drin&act=finishgivegold\" method='POST'>",true);
+            output("`nWieviel Gold deponieren? <input type='text' name='gold'>`n`n",true);
+            output("<input type='submit' class='button' value='Deponieren'>",true);
+            addnav("","houses.php?op=drin&act=finishgivegold");
+            output("</form>", true);
+        }
+        addnav('ZurÃ¼ck');
+        addnav("Schatzkammer","houses.php?op=drin");
+        addnav("zum Gemeinschaftsraum","houses.php?op=drin&module=");
+    }
+    elseif ($_GET['act']=="finishgivegold") {
+        if ($row['treasury_level'] == 20) {
+            $gold_limit = 999999999;
+        }
+        
+        $info = module_getinfo_treasury();
+        $moduleid = getmoduleid($info['modulename']);
+        $goldinhouse = (int)getmoduledata($moduleid,'gold',$session['user']['specialmisc']['houseid']);
+        if (empty($_POST['gold'])) {
+        
+        //$amt = ($gold_limit - $goldinhouse) > $session['user']['gold'] ? $session['user']['gold'] : $gold_limit;
+                         $gemsgold = $session['user']['gold'];
+            $max_AnzahlLeft1 = $gold_limit - $goldinhouse;
+            
+                    
+        if ($gemsgold<$max_AnzahlLeft1){
+        
+            $goldinhouse += $gemsgold;
+            setmoduledata($moduleid,'gold',$goldinhouse,$session['user']['specialmisc']['houseid']);
+            $session['user']['gold'] -= $gemsgold;
+            $session['user']['amountouttoday'] += $gemsgold;
+            output("`2Du hast `^".$gemsgold."`2 Gold deponiert. Insgesamt befinden sich jetzt `^$goldinhouse`2 Gold im Haus.");
+            $sql="INSERT INTO commentary (postdate,section,author,comment) VALUES (now(),'house_tresor-".$session['user']['specialmisc']['houseid']."',".$session['user']['acctid'].",'".$session['user']['name']."`0 `@deponiert `^$amt`@ Gold.')";
+            db_query($sql) or die(db_error(LINK));
+        }
+        
+        
+    if ($gemsgold>$max_AnzahlLeft1 && $goldinhouse!=$gold_limit){
+        
+        
+            $goldinhouse += $max_AnzahlLeft1;
+            setmoduledata($moduleid,'gold',$goldinhouse,$session['user']['specialmisc']['houseid']);
+            $session['user']['gold'] -= $max_AnzahlLeft1;
+            $session['user']['amountouttoday'] += $max_AnzahlLeft1;
+            output("`2Du hast `^".$max_AnzahlLeft1."`2 Gold deponiert. Insgesamt befinden sich jetzt `^$goldinhouse`2 Gold im Haus.");
+            $sql="INSERT INTO commentary (postdate,section,author,comment) VALUES (now(),'house_tresor-".$session['user']['specialmisc']['houseid']."',".$session['user']['acctid'].",'".$session['user']['name']."`0 `@deponiert `^$amt`@ Gold.')";
+            db_query($sql) or die(db_error(LINK));
+        }
+        
+        
+        
+        
+        if ($gemsgold>$max_AnzahlLeft1){
+            output("Soviel Gold hast du nicht oder bekommst du nicht in den Schatz!");
+}
+        }
+        else {
+            $amt = (int)$_POST['gold'];
+            $cheatProtect = $amt + $goldinhouse;
+            
+            
+            if ($amt>$session['user']['gold']) {
+                output("`2So viel Gold hast du nicht dabei.");
+            }
+            elseif ($goldinhouse >= $gold_limit) {
+                output("`2Der Schatz ist voll.");
+            }
+            elseif ($amt>($gold_limit - $goldinhouse)) {
+                output("`2Du gibst alles, aber du bekommst beim besten Willen nicht so viel in den Schatz.");
+            }
+            elseif ($amt<0) {
+                output("`2Wenn du etwas aus dem Schatz nehmen willst, versuche nicht, etwas negatives hineinzutun.");
+            }elseif ($cheatProtect>$gold_limit ){
+                output("`2Du gibst alles, aber du bekommst beim besten Willen nicht so viel in den Schatz.");
+            }
+            else {
+                $goldinhouse += $amt;
+                setmoduledata($moduleid,'gold',$goldinhouse,$session['user']['specialmisc']['houseid']);
+                $session['user']['gold'] -= $amt;
+                $session['user']['amountouttoday'] += $amt;
+                output("`2Du hast `^$amt`2 Gold deponiert. Insgesamt befinden sich jetzt `^$goldinhouse`2 Gold im Haus.");
+                $sql="INSERT INTO commentary (postdate,section,author,comment) VALUES (now(),'house_tresor-".$session['user']['specialmisc']['houseid']."',".$session['user']['acctid'].",'".$session['user']['name']."`0 `@deponiert `^$amt`@ Gold.')";
+                db_query($sql) or die(db_error(LINK));
+            }
+        }
+        addnav('ZurÃ¼ck');
+        addnav("Schatzkammer","houses.php?op=drin");
+        addnav("zum Gemeinschaftsraum","houses.php?op=drin&module=");
+    }
+    elseif ($_GET['act']=="takegems"){
+        $info = module_getinfo_treasury();
+        $moduleid = getmoduleid($info['modulename']);
+        $gemsinhouse = (int)getmoduledata($moduleid,'gems',$session['user']['specialmisc']['houseid']);
+        
+        $action = isset($_POST['action']) ? $_POST['action'] : '';
+        if ($action == 'takegems') {
+            $amt=(int)$_POST['gems'];
+            if ($amt>$gemsinhouse){
+                output("`2So viele Edelsteine sind nicht mehr da.");
+            }
+            elseif ($amt<0) {
+                output("`2Wenn du etwas in den Schatz legen willst, versuche nicht, etwas negatives herauszunehmen.");
+            }
+            else {
+                $amt = $amt == 0 ? $gemsinhouse : $amt;
+                $gemsinhouse -= $amt;
+                setmoduledata($moduleid,'gems',$gemsinhouse,$session['user']['specialmisc']['houseid']);
+                $session['user']['gems'] += $amt;
+                output("`2Du hast `%$amt Edelsteine`2 genommen. Insgesamt befindet sich jetzt noch `%$gemsinhouse Edelsteine`2 im Haus.");
+                $sql = "INSERT INTO commentary (postdate,section,author,comment) VALUES (now(),'house_tresor-".$session['user']['specialmisc']['houseid']."',".$session['user']['acctid'].",'".$session['user']['name']."`0 `\$nimmt `%$amt Edelsteine`\$.')";
+                db_query($sql) or die(db_error(LINK));
+            }
+        }
+        else {
+            output("`2Es befinden sich `%$gemsinhouse Edelsteine`2 in der Schatztruhe des Hauses.`n");
+            output("`2<form action=\"houses.php?op=drin&act=takegems\" method='POST'>",true);
+            output("<input type='hidden' name='action' value='takegems'>",true);
+            output("`nWieviele Edelsteine mitnehmen? <input type='text' name='gems'>`n`n",true);
+            output("<input type='submit' class='button' value='Mitnehmen'>",true);
+            addnav("","houses.php?op=drin&act=takegems");
+            output("</form>", true);
+        }
+        addnav('ZurÃ¼ck');
+        addnav("Schatzkammer","houses.php?op=drin");
+        addnav("zum Gemeinschaftsraum","houses.php?op=drin&module=");
+    }
+    elseif ($_GET['act']=="givegems") {
+        if ($row['treasury_level'] == 20) {
+            $gem_limit = 999999;
+        }
+        
+        $info = module_getinfo_treasury();
+        $moduleid = getmoduleid($info['modulename']);
+        $gemsinhouse = (int)getmoduledata($moduleid,'gems',$session['user']['specialmisc']['houseid']);
+        if (empty($_POST['gems'])) {
+            output("`2Derzeit befinden sich `%{$gemsinhouse} Edelsteine`2 im Schatz.`n");
+            output("Du kannst noch `%".($gem_limit - $gemsinhouse)." Edelsteine `2deponieren.`n");
+            output("`2<form action=\"houses.php?op=drin&act=finishgivegems\" method='POST'>",true);
+            output("`nWieviele Edelsteine deponieren? <input type='text' name='gems'>`n`n",true);
+            output("<input type='submit' class='button' value='Deponieren'>",true);
+            addnav("","houses.php?op=drin&act=finishgivegems");
+            output("</form>", true);
+        }
+        addnav('ZurÃ¼ck');
+        addnav("Schatzkammer","houses.php?op=drin");
+        addnav("zum Gemeinschaftsraum","houses.php?op=drin&module=");
+    }
+    elseif ($_GET['act']=="finishgivegems") {
+        if ($row['treasury_level'] == 20) {
+            $gem_limit = 999999;
+        }
+        
+        $info = module_getinfo_treasury();
+        $moduleid = getmoduleid($info['modulename']);
+        $gemsinhouse = (int)getmoduledata($moduleid,'gems',$session['user']['specialmisc']['houseid']);
+        if (empty($_POST['gems'])) {
+                
+            //$amt = ($gem_limit - $gemsinhouse) > $session['user']['gems'] ? $session['user']['gems'] : $gem_limit;
+                 $gemsplayer = $session['user']['gems'];
+            $max_AnzahlLeft = $gem_limit - $gemsinhouse;
+            
+                    
+        if ($gemsplayer<$max_AnzahlLeft){
+            
+            
+            $gemsinhouse += $gemsplayer;
+            setmoduledata($moduleid,'gems',$gemsinhouse,$session['user']['specialmisc']['houseid']);
+            $session['user']['gems'] -= $gemsplayer;
+            output("`2Du hast `%".$gemsplayer." Edelsteine`2 deponiert. Insgesamt befinden sich jetzt `%$gemsinhouse Edelsteine`2 im Haus.");
+            $sql="INSERT INTO commentary (postdate,section,author,comment) VALUES (now(),'house_tresor-".$session['user']['specialmisc']['houseid']."',".$session['user']['acctid'].",'".$session['user']['name']."`0 `@deponiert `%$amt Edelsteine`@.')";
+            db_query($sql) or die(db_error(LINK));
+            
+        }
+        
+            if ($gemsplayer>$max_AnzahlLeft && $gemsinhouse!=$gems_limit){
+        
+        
+            $gemsinhouse += $max_AnzahlLeft;
+            setmoduledata($moduleid,'gems',$gemsinhouse,$session['user']['specialmisc']['houseid']);
+            $session['user']['gems'] -= $max_AnzahlLeft;
+            output("`2Du hast `%".$max_AnzahlLeft." Edelsteine`2 deponiert. Insgesamt befinden sich jetzt `%$gemsinhouse Edelsteine`2 im Haus.");
+            $sql="INSERT INTO commentary (postdate,section,author,comment) VALUES (now(),'house_tresor-".$session['user']['specialmisc']['houseid']."',".$session['user']['acctid'].",'".$session['user']['name']."`0 `@deponiert `%$amt Edelsteine`@.')";
+            db_query($sql) or die(db_error(LINK));
+        }
+        
+        
+        
+        if ($gemsplayer>$max_AnzahlLeft){
+            output("Soviele Edelsteine hast du nicht oder du bekommst nicht soviele hinein!");
+}
+        }
+        else {
+            $amt=(int)$_POST['gems'];
+            $cheatProtect1 = $amt + $gemsinhouse;
+            if ($amt>$session['user']['gems']) {
+                output("`2So viele Edelsteine hast du nicht dabei.");
+            }
+            elseif ($gemsinhouse >= $gem_limit) {
+                output("`2Der Schatz ist voll.");
+            }
+            elseif ($amt>($gem_limit - $gemsinhouse)) {
+                output("`2Du gibst alles, aber du bekommst beim besten Willen nicht so viel in den Schatz.");
+            }
+            elseif ($amt<0) {
+                output("`2Wenn du etwas aus dem Schatz nehmen willst, versuche nicht, etwas negatives hineinzutun.");
+            }
+            
+            elseif ($cheatProtect1>$gem_limit ){
+                output("`2Du gibst alles, aber du bekommst beim besten Willen nicht so viel in den Schatz.");
+            }
+            
+            
+            else {
+                $gemsinhouse += $amt;
+                setmoduledata($moduleid,'gems',$gemsinhouse,$session['user']['specialmisc']['houseid']);
+                $session['user']['gems'] -= $amt;
+                output("`2Du hast `%$amt Edelsteine`2 deponiert. Insgesamt befinden sich jetzt `%$gemsinhouse Edelsteine`2 im Haus.");
+                $sql="INSERT INTO commentary (postdate,section,author,comment) VALUES (now(),'house_tresor-".$session['user']['specialmisc']['houseid']."',".$session['user']['acctid'].",'".$session['user']['name']."`0 `@deponiert `%$amt Edelsteine`@.')";
+                db_query($sql) or die(db_error(LINK));
+            }
+        }
+        addnav('ZurÃ¼ck');
+        addnav("Schatzkammer","houses.php?op=drin");
+        addnav("zum Gemeinschaftsraum","houses.php?op=drin&module=");
+    }
+    else {
+        output('`2Du betrittst die `^Schatzkammer`2 des Hauses - hier werden die ReichtÃ¼mer
+                der Bewohner aufbewahrt. AuÃŸerdem erblickst du einen verschlossenen SchlÃ¼sselkasten.`n`n');
+        
+        $owner = db_fetch_assoc(db_query("SELECT h.owner, emailaddress FROM houses h, accounts a WHERE h.houseid = '".$session['user']['specialmisc']['houseid']."' AND h.owner = a.acctid"));
+        if ($owner['emailaddress'] != $session['user']['emailaddress'] || $owner['owner'] == $session['user']['acctid']) {
+        
+            addnav('Gold');
+            addnav("Deponieren","houses.php?op=drin&act=givegold");
+            addnav("Mitnehmen","houses.php?op=drin&act=takegold");
+
+            addnav('Edelsteine');
+            addnav("Deponieren","houses.php?op=drin&act=givegems");
+            addnav("Mitnehmen","houses.php?op=drin&act=takegems");
+
+            addnav("SchlÃ¼ssel");
+            if ($session['user']['house']==$session['user']['specialmisc']['houseid']){
+                addnav("Vergeben","houses.php?op=drin&module=6&act=givekey");
+                addnav("n?ZurÃ¼cknehmen","houses.php?op=drin&act=takekey");
+            }
+            else {
+                addnav("n?ZurÃ¼ckgeben","houses.php?op=drin&act=givebackkey");
+            }
+        } else {
+            output("#ff0000 `bDu hast als Multi-Charakter keinen Zugriff auf die Schatzkammer.`b");
+        }
+        addnav('ZurÃ¼ck');
+        addnav("zum Gemeinschaftsraum","houses.php?op=drin&module=");
+        
+        $info = module_getinfo_treasury();
+        $moduleid = getmoduleid($info['modulename']);
+        $goldinhouse = (int)getmoduledata($moduleid,'gold',$session['user']['specialmisc']['houseid']);
+        $gemsinhouse = (int)getmoduledata($moduleid,'gems',$session['user']['specialmisc']['houseid']);
+        output("`n`n`2ReichtÃ¼mer:`n");
+        output("`^".$goldinhouse." Gold`n");
+        output("`%".$gemsinhouse." Edelsteine");
+        
+        // MÃ¶bel
+        $sql = "SELECT * FROM items WHERE class='MÃ¶bel' AND value1=".$session['user']['specialmisc']['houseid']." AND value2=6 AND name!='' ORDER BY id ASC";
+        $result = db_query($sql) or die(db_error(LINK));
+        $sql = "SELECT * FROM items WHERE class='Geschenk' AND value1=".$session['user']['specialmisc']['houseid']." AND value2=6 AND name!='' ORDER BY id ASC";
+        $result1 = db_query($sql) or die(db_error(LINK));
+        $sql = "SELECT * FROM items WHERE class='Deko' AND value1=".$session['user']['specialmisc']['houseid']." AND value2=6 AND name!='' ORDER BY id ASC";
+        $result2 = db_query($sql) or die(db_error(LINK));
+        
+        output("`n`n`n`q`bExtra Ausstattung:`0`b`n",true);
+        
+        if(db_num_rows($result) > 0){
+            output("`n`bMÃ¶bel:`b");
+            for($i=0;$i<=db_num_rows($result);$i++){
+                $item = db_fetch_assoc($result);
+                if($item['name']) output("`n`&".$item['name']."`0 (`i".$item['description']."`0`i)",true);
+            }
+            output("`n");
+        }else{
+            $fur1 = 1;
+        }
+            
+        if(db_num_rows($result2) > 0){
+            output("`n`bDeko:`b");
+            for($i=0;$i<=db_num_rows($result2);$i++){
+                $item2 = db_fetch_assoc($result2);
+                if($item2['name']) output("`n`&".$item2['name']."`0 (`i".$item2['description']."`0`i)",true);
+            }
+            output("`n");
+        }else{
+            $fur2 = 1;
+        }
+            
+        if(db_num_rows($result1) > 0){
+            output("`n`bGeschenke:`b");
+            for($i=0;$i<=db_num_rows($result1);$i++){
+                $item1 = db_fetch_assoc($result1);
+                if($item1['name']) output("`n`&".$item1['name']."`0 (`i".$item1['description']."`0`i)",true);
+            }
+            output("`n");
+        }else{
+            $fur3 = 1;
+        }
+            
+        if($fur1 == 1 AND $fur2 == 1 AND $fur3 == 1) output("`i`&noch keine`0`i");
+        // MÃ¶bel Ende
+
+        
+        $sql = "SELECT comment FROM commentary WHERE section='house_tresor-".$session['user']['specialmisc']['houseid']."' ORDER BY commentid ASC";
+        $result2 = db_query($sql) or die(db_error(LINK));
+        if(db_num_rows($result2)){
+            output("`n`n`n`q`bTransaktionen:`0`b`n");
+            for ($i=0;$i<=db_num_rows($result2);$i++){
+                $item = db_fetch_assoc($result2);
+                output("".$item['comment']."`0`n",true);
+            }
+        }
+    }
+
+    // uncomment these lines if you want to show the default navs even if this is not the default module
+    // global $shownavs;
+    // $shownavs = true;
+
+    // uncomment these lines if you want to hide the default navs even if this is the default module
+    // global $shownavs;
+    // $shownavs = false;
+/* content_show end */
+}
+?>
+
+
