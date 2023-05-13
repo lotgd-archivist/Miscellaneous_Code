@@ -1,0 +1,3 @@
+
+<?phprequire_once "common.php";page_header("Letzte Leistungen und Niederlagen");$result = db_query("SELECT name, acctid, login FROM accounts WHERE acctid='".$_GET[char]."'");$row2=db_fetch_assoc($result);output("`n`^Letzte Leistungen (und Niederlagen) von $row2[name]`^");$result = db_query("SELECT * FROM news WHERE accountid=$row2[acctid] ORDER BY newsdate DESC,newsid ASC LIMIT 100");$odate="";for ($i=0;$i<db_num_rows($result);$i++){    $row = db_fetch_assoc($result);    if ($odate!=$row[newsdate]){        output("`n`b`@".date("D, M d",strtotime($row[newsdate]))."`b`n");        $odate=$row[newsdate];    }    output($row[newstext]."`n");}addnav("Zur Liste der Krieger","list.php");addnav("Zurück","bio.php?char=".rawurlencode($row2['login'])."");page_footer();?>
+
